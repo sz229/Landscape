@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Landscape: layer maps</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Same palette and fonts as the layer maps, so the home page feels like part of the set. */
+  :root {
+    --bg: #f3f5f7;
+    --surface: #ffffff;
+    --ink: #15202b;
+    --muted: #5b6877;
+    --line: #d5dce3;
+    --accent: #2a5b88;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 64px 24px 80px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 12px;
+  }
+  h1 {
+    font-family: "Archivo", sans-serif; font-weight: 700;
+    font-size: clamp(32px, 5vw, 44px); line-height: 1.08; margin: 0 0 14px;
+  }
+  .lede { color: var(--muted); font-size: 17px; line-height: 1.55; margin: 0 0 36px; max-width: 620px; }
+  .toolbar { display: flex; gap: 14px; align-items: center; margin-bottom: 20px; }
+  .toolbar input {
+    flex: 1; font: inherit; font-size: 15px; padding: 11px 14px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
+  }
+  .toolbar input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .count { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .grid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 16px;
+  }
+  .grid li[hidden] { display: none; }
+  .card {
+    display: flex; flex-direction: column; height: 100%;
+    padding: 22px 22px 18px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 10px;
+    text-decoration: none; color: inherit;
+    transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover, .card:focus-visible {
+    border-color: var(--accent); transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(21, 32, 43, .06); outline: none;
+  }
+  .card .folder {
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 6px;
+  }
+  .card h2 { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 20px; line-height: 1.25; margin: 0 0 8px; }
+  .card .file { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .card .open { margin-top: auto; padding-top: 18px; font-size: 14px; font-weight: 500; color: var(--accent); }
+  .status { color: var(--muted); font-size: 15px; line-height: 1.55; padding: 8px 0; }
+  .status a, footer a { color: var(--accent); }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); line-height: 1.6; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Landscape</p>
+  <h1>Layer maps</h1>
+  <p class="lede">Layer maps of each computing era. Pick one to open it. New maps appear here automatically.</p>
+
+  <div class="toolbar">
+    <input type="search" id="filter" placeholder="Filter maps" aria-label="Filter maps" autocomplete="off">
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+
+  <ul class="grid" id="maps"></ul>
+  <p class="status" id="status">Loading maps…</p>
+  <noscript><p class="status">This list needs JavaScript. You can also browse the files on <a href="https://github.com/sz229/Landscape">GitHub</a>.</p></noscript>
+
+  <footer id="footer"></footer>
+</main>
+
+<script>
+/*
+  How this page finds the maps:
+  It asks GitHub for the list of files in this repository and shows every .html file
+  (except this index.html and a 404.html, if you add one). Upload a new map and it shows
+  up here on its own, with no edits to this page.
+
+  Titles come from file names: "AI-Era-Layer-Map.html" shows as "AI Era Layer Map".
+  To choose the order, start file names with a number, like "1-Internet-Era-Layer-Map.html";
+  the number sets the order and is hidden from the title. Without numbers, maps are listed A to Z.
+*/
+(function () {
+  var DEFAULT_OWNER = 'sz229';
+  var DEFAULT_REPO = 'Landscape';
+  var BRANCH = 'main';
+  var SKIP = ['index.html', '404.html'];
+  var CACHE_MINUTES = 5;
+
+  // Work out the GitHub account and repository from the page address
+  // (sz229.github.io/Landscape/ -> sz229 / Landscape). Falls back to the defaults
+  // when the page is opened from your own computer.
+  var host = location.hostname;
+  var onPages = /\.github\.io$/i.test(host);
+  var owner = DEFAULT_OWNER;
+  var repo = DEFAULT_REPO;
+  if (onPages) {
+    owner = host.split('.')[0];
+    var firstPart = location.pathname.split('/').filter(Boolean)[0];
+    repo = firstPart && !/\.html?$/i.test(firstPart) ? firstPart : owner + '.github.io';
+  }
+  // On the live site, links are relative. Opened locally, links point to the live site.
+  var linkBase = onPages ? '' : 'https://' + owner.toLowerCase() + '.github.io/' + repo + '/';
+  var repoUrl = 'https://github.com/' + owner + '/' + repo;
+  var apiUrl = 'https://api.github.com/repos/' + owner + '/' + repo + '/git/trees/' + BRANCH + '?recursive=1';
+  var cacheKey = 'landscape-index:' + owner + '/' + repo;
+
+  var list = document.getElementById('maps');
+  var status = document.getElementById('status');
+  var count = document.getElementById('count');
+  var filter = document.getElementById('filter');
+  document.getElementById('footer').innerHTML =
+    'This page lists every map in the <a href="' + repoUrl + '">' + owner + '/' + repo +
+    '</a> repository. Add an .html file there and it appears here after GitHub Pages updates, usually within a few minutes.';
+
+  function readCache() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(cacheKey));
+      if (saved && Date.now() - saved.time < CACHE_MINUTES * 60 * 1000) return saved.paths;
+    } catch (e) {}
+    return null;
+  }
+  function writeCache(paths) {
+    try { localStorage.setItem(cacheKey, JSON.stringify({ time: Date.now(), paths: paths })); } catch (e) {}
+  }
+
+  function isMap(path) {
+    if (!/\.html?$/i.test(path)) return false;
+    if (SKIP.indexOf(path.toLowerCase()) !== -1) return false;
+    if (/(^|\/)[._]/.test(path)) return false; // hidden files and folders are not published
+    return true;
+  }
+
+  function titleFrom(path) {
+    var name = path.split('/').pop().replace(/\.html?$/i, '');
+    name = name.replace(/^\d+[-_ .]+/, ''); // drop an ordering number like "1-" or "02_"
+    return name.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function hrefFor(path) {
+    return linkBase + path.split('/').map(encodeURIComponent).join('/');
+  }
+
+  function render(paths) {
+    // Sort by file name (not folder), so numbers like "1-" and "2-" set the order.
+    paths = paths.slice().sort(function (a, b) {
+      var byName = a.split('/').pop().localeCompare(b.split('/').pop(), undefined, { numeric: true, sensitivity: 'base' });
+      return byName || a.localeCompare(b);
+    });
+    list.innerHTML = '';
+    paths.forEach(function (path) {
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.className = 'card';
+      a.href = hrefFor(path);
+      var parts = path.split('/');
+      if (parts.length > 1) {
+        var folder = document.createElement('div');
+        folder.className = 'folder';
+        folder.textContent = parts.slice(0, -1).join(' / ');
+        a.appendChild(folder);
+      }
+      var h2 = document.createElement('h2');
+      h2.textContent = titleFrom(path);
+      var file = document.createElement('div');
+      file.className = 'file';
+      file.textContent = path;
+      var open = document.createElement('span');
+      open.className = 'open';
+      open.textContent = 'Open map →';
+      a.appendChild(h2);
+      a.appendChild(file);
+      a.appendChild(open);
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    applyFilter();
+  }
+
+  function applyFilter() {
+    var term = filter.value.trim().toLowerCase();
+    var items = list.children;
+    var shown = 0;
+    for (var i = 0; i < items.length; i++) {
+      var match = !term || items[i].textContent.toLowerCase().indexOf(term) !== -1;
+      items[i].hidden = !match;
+      if (match) shown++;
+    }
+    count.textContent = shown + (shown === 1 ? ' map' : ' maps');
+    if (items.length === 0) {
+      status.innerHTML = 'No maps yet. Upload an .html file to <a href="' + repoUrl + '">the repository</a> and it will appear here.';
+      status.hidden = false;
+    } else if (shown === 0) {
+      status.textContent = 'No maps match "' + filter.value.trim() + '".';
+      status.hidden = false;
+    } else {
+      status.hidden = true;
+    }
+  }
+
+  function showError(reason) {
+    filter.disabled = true;
+    count.textContent = '';
+    status.innerHTML = 'Could not load the list of maps (' + reason + '). GitHub allows a limited number of lookups per hour, ' +
+      'so try again in a few minutes, or browse the files on <a href="' + repoUrl + '">GitHub</a>.';
+    status.hidden = false;
+  }
+
+  filter.addEventListener('input', applyFilter);
+
+  var cached = readCache();
+  if (cached) { render(cached); return; }
+
+  fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' } })
+    .then(function (res) {
+      if (!res.ok) throw new Error('GitHub answered ' + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      var paths = (data.tree || [])
+        .filter(function (node) { return node.type === 'blob' && isMap(node.path); })
+        .map(function (node) { return node.path; });
+      writeCache(paths);
+      render(paths);
+    })
+    .catch(function (err) { showError(err && err.message ? err.message : 'network error'); });
+})();
+</script>
+</body>
+</html>
