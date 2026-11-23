@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Era Layer Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Same visual system as the cloud and internet maps. Rows are layers (customers on top, physical at the bottom);
+   columns are what the layer holds, who is in it, what it rhymes with from past waves, and where startups can still get in. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #15202b;
+  --muted: #5b6877;
+  --line: #d5dce3;
+  --accent: #2a5b88;
+
+  --open: #1d7f47;
+  --taken: #7d705e;
+  --exit: #a86c12;
+  --watch: #b8392f;
+  --next: #6b45b0;
+
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141a; --surface: #161f28; --ink: #e5ebf1; --muted: #9aa8b6; --line: #2a3643; --accent: #7eaedc;
+    --open: #4cc07f; --taken: #b2a58f; --exit: #dfa449; --watch: #ee6b62; --next: #a98ae6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141a; --surface: #161f28; --ink: #e5ebf1; --muted: #9aa8b6; --line: #2a3643; --accent: #7eaedc;
+  --open: #4cc07f; --taken: #b2a58f; --exit: #dfa449; --watch: #ee6b62; --next: #a98ae6;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1480px; margin: 0 auto; padding: 32px 24px 64px; }
+@media (max-width: 500px) { .wrap { padding: 24px 16px 48px; } }
+
+header.top { display: grid; gap: 10px; max-width: 780px; }
+.kicker {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--accent);
+}
+h1 {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(26px, 3.4vw, 38px); line-height: 1.1; letter-spacing: -0.01em;
+  margin: 0; text-wrap: balance;
+}
+.lede { margin: 0; color: var(--muted); font-size: 16px; max-width: 68ch; }
+
+/* Legend / filter */
+.legend { margin-top: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.legend-label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+.fbtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font: 500 13px/1 var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 12px 7px 10px; cursor: pointer;
+}
+.fbtn:hover { border-color: var(--muted); }
+.fbtn[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.fbtn .g { font-size: 12px; width: 12px; text-align: center; font-weight: 600; }
+.fbtn .n { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fbtn.reset { color: var(--muted); }
+.legend-note { flex-basis: 100%; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+[data-s="open"]  { --sc: var(--open); }
+[data-s="taken"] { --sc: var(--taken); }
+[data-s="exit"]  { --sc: var(--exit); }
+[data-s="watch"] { --sc: var(--watch); }
+[data-s="next"]  { --sc: var(--next); }
+.g { color: var(--sc); }
+
+/* The map */
+.map { margin-top: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, .75fr) minmax(0, .9fr) minmax(0, 1fr) minmax(0, 2.2fr);
+}
+.row + .row { border-top: 1px solid var(--line); }
+.cell { padding: 14px; min-width: 0; }
+.cell + .cell { border-left: 1px solid var(--line); }
+
+.row.head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 10px 10px 0 0;
+}
+.row.head .cell { padding-top: 12px; padding-bottom: 10px; }
+.col-name { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.col-desc { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+
+.cell.layer {
+  background: color-mix(in srgb, var(--accent) var(--tint), var(--surface));
+  display: grid; align-content: start; gap: 4px;
+}
+.lnum { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); font-weight: 500; }
+.lname { font-family: var(--font-display); font-weight: 600; font-size: 16.5px; line-height: 1.2; text-wrap: balance; }
+.lsub { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.odds {
+  margin-top: 8px; display: grid; gap: 2px;
+  font-size: 12px; line-height: 1.35;
+  border-top: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--line)); padding-top: 8px;
+}
+.odds .ok { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.odds .ov { font-weight: 600; color: var(--oddc); }
+.odds[data-odds="hi"]  { --oddc: var(--open); }
+.odds[data-odds="mid"] { --oddc: var(--exit); }
+.odds[data-odds="lo"]  { --oddc: var(--watch); }
+
+.cell-label { display: none; }
+
+.what { font-size: 13.5px; line-height: 1.5; color: var(--ink); margin: 0; }
+
+.ex { display: grid; gap: 6px; font-size: 13px; line-height: 1.45; }
+.ex div { overflow-wrap: anywhere; }
+.ex .k { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-right: 4px; }
+.ex .cn { border-top: 1px dashed var(--line); padding-top: 6px; }
+.ex .cn .k { color: var(--ink); font-weight: 600; }
+
+.rh { display: grid; gap: 8px; }
+.rh-item { font-size: 13px; line-height: 1.45; }
+.rh-era {
+  display: inline-block; font-family: var(--font-mono); font-size: 10.5px; font-weight: 500;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 4px; padding: 0 5px; margin-right: 5px; line-height: 17px; vertical-align: 1px;
+}
+.rh-text { color: var(--ink); }
+
+.opps { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; align-content: start; }
+.chip {
+  display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 6px;
+  padding: 6px 9px 7px 7px;
+  align-content: start;
+  border-left: 3px solid var(--sc);
+  background: color-mix(in srgb, var(--sc) 7%, var(--surface));
+  border-radius: 3px 6px 6px 3px;
+  transition: opacity .15s ease;
+}
+.chip .g { font-size: 11px; line-height: 20px; text-align: center; font-weight: 700; }
+.chip .nm { font-weight: 600; font-size: 13.5px; line-height: 20px; overflow-wrap: anywhere; }
+.chip .nt { grid-column: 2; font-size: 12.5px; line-height: 1.42; color: var(--muted); overflow-wrap: anywhere; }
+.map[data-filter] .chip { opacity: .2; }
+.map[data-filter="open"]  .chip[data-s="open"],
+.map[data-filter="taken"] .chip[data-s="taken"],
+.map[data-filter="exit"]  .chip[data-s="exit"],
+.map[data-filter="watch"] .chip[data-s="watch"],
+.map[data-filter="next"]  .chip[data-s="next"] { opacity: 1; }
+
+.read-hint { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
+
+/* Narrow screens: each layer becomes a card */
+@media (max-width: 1080px) {
+  .row { grid-template-columns: 1fr; }
+  .row.head { display: none; }
+  .cell + .cell { border-left: 0; border-top: 1px solid var(--line); }
+  .cell-label {
+    display: block; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);
+    font-weight: 500; margin-bottom: 6px;
+  }
+  .row + .row { border-top: 6px solid var(--bg); }
+  .cell.layer { grid-template-columns: 1fr; }
+  .odds { max-width: 520px; }
+}
+
+/* Sections below the map */
+section.block { margin-top: 44px; }
+h2 {
+  font-family: var(--font-display); font-weight: 700; font-size: 22px;
+  margin: 0 0 6px; letter-spacing: -0.005em; text-wrap: balance;
+}
+.section-lede { margin: 0 0 16px; color: var(--muted); max-width: 70ch; }
+
+/* Players spanning layers */
+.span-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+table.span { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13px; }
+table.span th, table.span td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: center; }
+table.span tr:last-child td { border-bottom: 0; }
+table.span th { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; color: var(--accent); }
+table.span th.pl, table.span td.pl { text-align: left; white-space: nowrap; }
+table.span td.pl { font-weight: 600; }
+table.span td.pl .cn { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+table.span td.on span {
+  display: inline-block; font-size: 11.5px; line-height: 1.25; color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-radius: 5px; padding: 3px 6px; max-width: 110px;
+}
+table.span td.off::before { content: "·"; color: var(--line); font-size: 16px; }
+
+.patterns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.pat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.pat .pn { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); }
+.pat h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; line-height: 1.25; text-wrap: balance; }
+.pat p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.pat .where { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+.method {
+  border-top: 3px solid var(--accent); background: var(--surface);
+  border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  border-radius: 0 0 8px 8px; padding: 14px 18px; max-width: 900px;
+}
+.method h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0 0 4px; }
+.method p { margin: 0; font-size: 14px; color: var(--muted); }
+
+.sources { font-size: 13px; color: var(--muted); }
+.sources ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.sources a { color: var(--accent); }
+.foot { margin-top: 28px; font-size: 12.5px; color: var(--muted); max-width: 80ch; }
+
+@media (prefers-reduced-motion: reduce) { .chip { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="kicker">AI era · startup lens · as of Nov 2026</div>
+    <h1>AI Era Layer Map: what each layer rhymes with, and where startups can still get in</h1>
+    <p class="lede">Nine layers from power to consumer apps. Each row lists what's in the layer, the main players, the cloud- and internet-era patterns it echoes, and the openings we found layer by layer. L1, L8 and L9 haven't been reviewed in depth yet.</p>
+  </header>
+
+  <div class="legend" id="legend" role="group" aria-label="Filter opportunities by status">
+    <span class="legend-label">Openings:</span>
+  </div>
+
+  <div class="map" id="map">
+    <div class="row head" aria-hidden="true">
+      <div class="cell"><div class="col-name">Layer</div><div class="col-desc">Startup odds, from history</div></div>
+      <div class="cell"><div class="col-name">What's in it</div></div>
+      <div class="cell"><div class="col-name">Examples</div><div class="col-desc">China tagged within layers</div></div>
+      <div class="cell"><div class="col-name">Rhymes with</div><div class="col-desc">Cloud and internet-era patterns</div></div>
+      <div class="cell"><div class="col-name">New opportunities</div><div class="col-desc">What's open, taken, bought, or worth watching</div></div>
+    </div>
+  </div>
+  <p class="read-hint">Read top to bottom: customers at the top, physical infrastructure at the bottom. Click a status above to highlight it across all layers.</p>
+
+  <section class="block">
+    <h2>Players that span layers</h2>
+    <p class="section-lede">The biggest companies sit in several layers at once, which is why the "platform bundles the layer above" pattern keeps showing up.</p>
+    <div class="span-wrap"><table class="span" id="span"></table></div>
+  </section>
+
+  <section class="block">
+    <h2>Patterns that keep repeating</h2>
+    <p class="section-lede">The cloud and internet lessons that did the most work as we went through the layers.</p>
+    <div class="patterns" id="patterns"></div>
+  </section>
+
+  <section class="block">
+    <div class="method">
+      <h3>How to use a rhyme</h3>
+      <p>Trust a historical pattern only when you can name what caused it, then check whether that cause is present today. If the cause is gone, the pattern is gone too. First principles for the supply side (costs, capital, physics); history for the demand side (adoption, timing, competition).</p>
+    </div>
+  </section>
+
+  <section class="block sources">
+    <h2>Sources</h2>
+    <p class="section-lede" style="margin-bottom:6px">Figures come from web searches done during our layer-by-layer review in November 2026. Valuations are the latest reported rounds or talks; "reported" marks deals not confirmed by the companies. Key sources for L6 and L7:</p>
+    <ul>
+      <li><a href="https://sacra.com/research/fireworks-ai/">Sacra: Fireworks AI revenue and Series D</a></li>
+      <li><a href="https://fourweekmba.com/ai-baseten-set-for-a-30-billion-valuation-2-3x-its-june-mark/">FourWeekMBA (citing Bloomberg): Baseten at $26B and $30B</a></li>
+      <li><a href="https://techcrunch.com/2026/09/28/source-inference-provider-Modal-Labs-closing-in-on-750M-round-at-15.75B-valuation">TechCrunch: Modal Labs nearing $750M at $15.75B</a></li>
+      <li><a href="https://siliconangle.com/2026/11/03/generative-media-inference-startup-fal-raises-1-3b-at-a-16b-valuation/">SiliconANGLE: fal raises $1.3B at $16B</a></li>
+      <li><a href="https://techcrunch.com/2026/01/22/inference-startup-inferact-lands-150m-to-commercialize-vllm/">TechCrunch: Inferact raises $150M to commercialize vLLM</a></li>
+      <li><a href="https://pulse2.com/radixark-launches-with-100-million-in-seed-funding-to-democratize-frontier-ai-infrastructure/">Pulse 2.0: RadixArk launches with $100M seed</a></li>
+      <li><a href="https://stripe.com/newsroom/news/stripe-agrees-to-acquire-openrouter">Stripe: agreement to acquire OpenRouter</a></li>
+      <li><a href="https://latent.space/wiki/portkey-ai-5b678cc2/">Latent Space wiki: Portkey acquired by Palo Alto Networks</a></li>
+      <li><a href="https://pulse2.com/gimlet-labs-raises-300-million-series-b-led-by-andreessen-horowitz-at-3-billion-valuation/">Pulse 2.0: Gimlet Labs $300M Series B at $3B</a></li>
+      <li><a href="https://siliconangle.com/2026/05/27/tensormesh-taps-nvidia-amd-coreweave-funding-fix-llm-memory-problems/">SiliconANGLE: Tensormesh funding and KV cache hit rates</a></li>
+      <li><a href="https://www.aichatdaily.com/ai-business/applied-compute-closes-350m-round-3-25b-valuation">AI Chat Daily: Applied Compute at $3.25B</a></li>
+      <li><a href="https://sacra.com/research/langchain">Sacra: LangChain $300M Series C at $3B</a></li>
+      <li><a href="https://www.thesaasnews.com/news/daytona-raises-60m-series-b/">The SaaS News: Daytona $60M Series B at $1B</a></li>
+      <li><a href="https://www.axios.com/pro/enterprise-software-deals/2026/02/17/ai-observability-braintrust-80-million-800-million">Axios: Braintrust $80M at $800M</a></li>
+      <li><a href="https://pub.towardsai.net/the-llm-observability-land-grab-of-2026-477ac3624389">Towards AI: the 2026 LLM observability acquisitions</a></li>
+      <li><a href="https://thenewstack.io/dynatrace-arize-ai-observability/">The New Stack: Dynatrace's $915M Arize deal</a></li>
+      <li><a href="https://runloop.ai/media/anthropic-openai-google-and-microsoft-agree-that-the-harness-is-the-product-they-disagree-on-the-price">Runloop: how the labs priced their agent runtimes</a></li>
+      <li><a href="https://www.linuxfoundation.org/press/linux-foundation-announces-the-formation-of-the-agentic-ai-foundation">Linux Foundation: Agentic AI Foundation (MCP, goose, AGENTS.md)</a></li>
+    </ul>
+  </section>
+
+  <p class="foot">Made with Claude, which is built by Anthropic. Anthropic appears in L5, L7, L8 and L9 of this map, so weigh those rows with that in mind.</p>
+</div>
+
+<script>
+const STATUSES = {
+  open:  { g: "▲", label: "Open for startups" },
+  taken: { g: "●", label: "Already taken" },
+  exit:  { g: "→", label: "Bought or absorbed" },
+  watch: { g: "!", label: "Risk to watch" },
+  next:  { g: "◆", label: "Not reviewed yet" }
+};
+
+const LAYERS = [
+  {
+    n: "L9", name: "Consumer assistants & surfaces", sub: "Where people meet AI",
+    odds: ["hi", "Favored by history", "Not reviewed yet"],
+    what: "Chat assistants, and the phones, operating systems, browsers, messaging apps and glasses they ship inside.",
+    ex: [["Assistants", "ChatGPT, Gemini, Claude, Meta AI, Grok, Perplexity, Character.AI"],
+         ["Surfaces", "Android and Chrome, iPhone, Windows, WhatsApp, AI browsers, Meta glasses"]],
+    cn: "Doubao, Qwen app, DeepSeek app",
+    rh: [["Internet", "Browsers (IE vs Netscape): the platform owner bundles the layer on top"],
+         ["Internet", "Search and portals: owning demand plus a business model wins (Google)"],
+         ["Framework", "Consumer AI meets new needs, and new needs favor new companies"],
+         ["Cloud", "The distribution incumbent can come back (Microsoft)"]],
+    op: [["next", "Next to review", "History favors startups for new consumer needs, but whoever owns the phone, OS or browser can bundle an assistant."]]
+  },
+  {
+    n: "L8", name: "Enterprise apps & agents", sub: "AI sold to companies",
+    odds: ["hi", "Favored by history", "Not reviewed yet"],
+    what: "Coding agents, vertical copilots, customer-service agents, and AI added to existing business software.",
+    ex: [["Coding", "Cursor, Claude Code, Codex, GitHub Copilot, Cognition"],
+         ["Vertical", "Harvey, Abridge, Sierra, Glean"],
+         ["Incumbents", "Microsoft 365 Copilot, Agentforce, ServiceNow"]],
+    rh: [["Cloud", "Apps built on the cloud: SaaS specialists won the layer above a mature platform"],
+         ["Framework", "An upgrade that fits the incumbent's model goes to incumbents; one that breaks it (per seat → per outcome) goes to new entrants"],
+         ["Internet", "Productivity gains inside companies mostly went to existing vendors"]],
+    op: [["next", "Next to review", "Coding broke out first. The question is which sector is next: test whether AI fits each incumbent's pricing or breaks it."]]
+  },
+  {
+    n: "L7", name: "Agent infrastructure", sub: "The tools agents run on",
+    odds: ["hi", "Good place to start", "Usual exit is a sale, around $1B"],
+    what: "Sandboxes and agent computers, cloud browsers, frameworks, evals and observability, protocols and memory.",
+    ex: [["Sandboxes", "E2B, Daytona, Modal"],
+         ["Browsers", "Browserbase"],
+         ["Frameworks", "LangChain; MCP as the protocol"],
+         ["Evals", "Braintrust, Arize (now Dynatrace)"],
+         ["Memory", "Pinecone"],
+         ["Lab runtimes", "Claude Managed Agents, OpenAI Agents SDK, Google Managed Agents"]],
+    rh: [["Cloud", "Dev, ops and security tools: the further from the platform's core, the harder for the platform to win"],
+         ["Theory", "Commoditize your complement: labs keep protocols free so more agents use more tokens"],
+         ["Cloud", "Open core plus a paid managed service (MongoDB, Databricks)"],
+         ["Cloud", "Tool winners (Datadog, HashiCorp) got big years after the platform settled"]],
+    op: [["open", "Agent computers and sandboxes", "Daytona hit $1B with revenue up about 25× since January. Partnering works: OpenAI's Agents SDK plugs in Daytona, E2B, Modal and others."],
+         ["open", "Cloud browsers for agents", "Browserbase ($300M): open-source Stagehand plus a managed browser fleet."],
+         ["open", "Cross-lab frameworks + managed platform", "LangChain at $3B (Nov): open frameworks, paid LangSmith with about 7,000 customers."],
+         ["open", "Evals and testing", "Braintrust at $800M. Demand is strong, but incumbents keep buying this category."],
+         ["taken", "Protocols and standards", "MCP, AGENTS.md and goose sit in the Linux Foundation's Agentic AI Foundation: free by design, not a business."],
+         ["exit", "Observability bought by incumbents", "Langfuse → ClickHouse, Galileo → Cisco/Splunk, Arize → Dynatrace ($915M), Traceloop → ServiceNow."],
+         ["watch", "Labs bundle the runtime", "Anthropic, Google and AWS shipped managed agent runtimes within six weeks of each other."],
+         ["watch", "Delivery platforms moving up", "Baseten bought Blaxel's sandboxes; Modal sells a sandbox product."]]
+  },
+  {
+    n: "L6", name: "Model delivery", sub: "Serving models to apps",
+    odds: ["mid", "Mixed", "Low for general serving, high in new sub-layers"],
+    what: "Inference engines, serving platforms, routers and gateways, and the cloud providers' model hubs.",
+    ex: [["Engines", "vLLM (Inferact), SGLang (RadixArk), Nvidia Dynamo"],
+         ["Platforms", "Fireworks, Baseten, Together, Modal, fal"],
+         ["Fast chips as a service", "Groq, Cerebras"],
+         ["Routers", "OpenRouter (now Stripe)"],
+         ["Hubs", "Bedrock, Azure AI Foundry, Vertex"]],
+    rh: [["Cloud", "PaaS (Heroku): absorbed by the clouds unless neutral across models and chips"],
+         ["Cloud", "Docker: the creator of an open standard struggles to make money from it"],
+         ["Cloud", "Snowflake and Databricks: neutrality across platforms is the defense"],
+         ["Internet", "Akamai and CDNs: serving moves closer to users (on-device)"]],
+    op: [["taken", "General serving platforms", "Fireworks $17.5B (>$1B ARR), Baseten $13B and in talks at $26–30B, Modal about $15.75B, Together $8.3B."],
+         ["taken", "Inference engines", "Inferact $800M, RadixArk $400M. The best proprietary engines stay internal to the platforms."],
+         ["exit", "Routers and gateways", "OpenRouter → Stripe ($7B+), Portkey → Palo Alto Networks."],
+         ["open", "Multi-chip orchestration", "Gimlet Labs splits one workload across Nvidia, AMD, Cerebras, d-Matrix and more; valued at $3B in September."],
+         ["open", "AI-written kernels", "Standard Kernel ($20M seed), Infinity ($15M seed). The \"CUDA moat is shrinking\" idea, as a business."],
+         ["open", "KV cache as its own layer", "Tensormesh, built on LMCache ($24.5M raised); some customers hit cache rates above 70%."],
+         ["open", "Modality specialists", "fal (image, video, audio) at $16B with $800M+ annualized revenue. Repeats for voice, world models, robotics."],
+         ["open", "Custom models: train + serve", "Applied Compute $3.25B (Nov), Prime Intellect about $1B, Thinking Machines' Tinker. Demand still early."],
+         ["open", "On-device inference", "Mirai ($10M seed), Quadric, SiMa.ai (about $1.4B). A smaller market today."],
+         ["watch", "Leaders' weak spots", "About 50% gross margins, API-level switching costs, hyperscalers bundling inference, and concentration (Cursor was about half of Fireworks' revenue last year)."]]
+  },
+  {
+    n: "L5", name: "Foundation models", sub: "The models themselves",
+    odds: ["lo", "Very low for general models", "Real openings in niches"],
+    what: "Frontier general models, open-weight models, and foundation models built for specific domains.",
+    ex: [["Frontier", "OpenAI, Anthropic, Google DeepMind, xAI"],
+         ["Open-weight", "Meta Llama, Mistral, gpt-oss"]],
+    cn: "DeepSeek, Qwen, Kimi, GLM, MiniMax",
+    rh: [["Cloud", "A capital-heavy layer ends with 2–3 winners (like IaaS)"],
+         ["Internet", "Cheap and open beats premium (Linux): open weights, partly"],
+         ["Pattern", "Incumbents buy startups early, now as reverse acquihires"],
+         ["Pattern", "Neutrality as a moat: sovereign and regional labs"]],
+    op: [["taken", "General frontier models", "93.6% of $1.68T went to frontier generalists; OpenAI, Anthropic, xAI and Waymo took 65% of Q1 2026 global VC."],
+         ["open", "Neolabs led by star researchers", "Reflection $8B, Humans& $4.48B, AMI Labs $3.5B pre-money. Fragile: Thinking Machines' $50–60B round collapsed."],
+         ["open", "Domain foundation models", "Robotics: Skild $14B, Physical Intelligence $11B. Science: Periodic Labs. World models: World Labs, reportedly folded into AMD (~$8.2B)."],
+         ["open", "Sovereign and regional labs", "Mistral at about $24B, on track for $1B ARR."],
+         ["exit", "Reverse acquihires", "Inflection → Microsoft ($650M license), Character.AI → Google, Adept → Amazon, Poolside–Nvidia ($6B license, reported)."],
+         ["watch", "What could reopen the frontier", "A much cheaper architecture, a compute glut after a bust, or a new data source the labs can't get."]]
+  },
+  {
+    n: "L4", name: "Model inputs", sub: "Data and training signal",
+    odds: ["mid", "Strong but closing", "Labor-heavy, few buyers"],
+    what: "Expert human data, labeling, reinforcement-learning environments and data licensing.",
+    ex: [["Data vendors", "Scale AI, Surge, Mercor, Turing, Handshake, Micro1"],
+         ["Other", "RL environment builders; data licensing deals"]],
+    rh: [["Cloud", "Independents win through neutrality: labs moved work away from Scale AI after Meta's stake"],
+         ["Pattern", "Labor-heavy services: big revenue, thin margins, concentrated buyers"],
+         ["Framework", "A new need with no incumbent goes to new companies"]],
+    op: [["open", "Expert data networks", "Mercor $2B+ gross run rate (pays 60–70% to experts); Surge over $1B revenue, bootstrapped; Handshake, Micro1."],
+         ["open", "RL environments", "Anthropic discussed spending over $1B on them."],
+         ["open", "Being the neutral supplier", "The Scale AI–Meta deal showed labs won't buy from a vendor tied to a rival."],
+         ["watch", "Concentration", "About 91% of Mercor's revenue comes from OpenAI and Anthropic, and the window for new entrants is closing."]]
+  },
+  {
+    n: "L3", name: "Compute clouds", sub: "Renting AI compute",
+    odds: ["lo", "Low", "Wins need billions"],
+    what: "GPUs and accelerators rented by the hour or on multi-year contracts, from hyperscalers and neoclouds.",
+    ex: [["Hyperscalers", "AWS, Azure, Google Cloud, Oracle"],
+         ["Neoclouds", "CoreWeave, Nebius, Lambda, Crusoe"]],
+    cn: "Alibaba Cloud, Volcano Engine, Tencent Cloud",
+    rh: [["Cloud", "2013's \"everyone launches a cloud\" ended in a shakeout with 2–3 winners"],
+         ["Internet", "Hosting and data centers (Exodus): a debt-funded overbuild, then bankruptcies"],
+         ["Internet", "Bubble money and vendor financing"]],
+    op: [["taken", "General GPU clouds", "The hyperscalers plus a few scaled neoclouds."],
+         ["open", "New neocloud business models", "Power-first landlords, sovereign clouds, chip-maker clouds, compute marketplaces and futures (e.g. San Francisco Compute), operator software."],
+         ["watch", "Refinancing wall", "CoreWeave carries about $35B of debt against a $104B backlog; GPU depreciation is debated; the H100 rental index rose from $2.00 to $2.88."],
+         ["open", "After a bust", "The best openings may come later: buying cheap, distressed capacity, the way the next wave did after the 2001 fiber glut."]]
+  },
+  {
+    n: "L2", name: "Chips & systems", sub: "Silicon, memory and networking",
+    odds: ["mid", "High around the processor", "Low for training chips"],
+    what: "Training and inference accelerators, HBM memory, foundry, scale-up and scale-out networking, optics, rack power and chip design.",
+    ex: [["Chips", "Nvidia, AMD, Google TPU, AWS Trainium, Broadcom"],
+         ["Memory", "SK Hynix, Samsung, Micron"],
+         ["Foundry, network", "TSMC; Arista"]],
+    cn: "Huawei Ascend, Cambricon, SMIC",
+    rh: [["Internet", "Cheap and open beat premium (Linux/x86 vs Sun): fits inference chips best"],
+         ["Cloud", "The biggest buyers become their own suppliers (TPU, Trainium)"],
+         ["Pattern", "Gross margin is the moat signal: Nvidia about 75% vs AMD about 57%; watch for an Intel-style slide"]],
+    op: [["open", "Inference chips built around memory", "All-SRAM (Groq, Cerebras); 3D-stacked DRAM (Fractile, d-Matrix, Suanmiao); hybrid memory (Etched, MatX); cheap memory instead of HBM (Positron, Tenstorrent); dataflow (SambaNova)."],
+         ["open", "Radical approaches", "Hardwired models (Taalas, now AMD); new physics (Unconventional AI); optical compute (Lumai)."],
+         ["open", "Co-packaged optics", "Ayar Labs ($3.75B); Celestial AI → Marvell ($3.25B)."],
+         ["open", "Open scale-up switches (UALink)", "Upscale AI ($2B): an open alternative to NVLink inside the rack."],
+         ["open", "800V rack power delivery", "AmberSemi, Lotus."],
+         ["open", "AI for chip design", "ChipAgents, Cognichip."],
+         ["taken", "Training chips", "Nvidia leads; AMD and TPU are catching up. The cheap-beats-premium climb doesn't fit: big buyers build their own."],
+         ["watch", "Nvidia's networking moat", "Ethernet overtook InfiniBand between racks (Nvidia sells Ethernet too, as Spectrum-X); NVLink still rules inside the rack."]]
+  },
+  {
+    n: "L1", name: "Power & data centers", sub: "Energy and buildings",
+    odds: ["lo", "Hardest for startups", "Not reviewed yet"],
+    what: "Power generation, grid equipment, data center campuses and cooling.",
+    ex: [["Power", "Constellation, Vistra, NextEra"],
+         ["Grid gear", "GE Vernova, Siemens Energy"],
+         ["Data centers", "Equinix, Digital Realty, QTS"],
+         ["Giant campuses", "Stargate, Crusoe"]],
+    rh: [["Internet", "Fiber and backbone: overbuilding bankrupted the builders, and the next wave rode the cheap capacity"],
+         ["Internet", "The crash doesn't pick winners"],
+         ["Cloud", "Equinix: neutral meeting points gain value as more networks connect"]],
+    op: [["next", "Next to review", "History says this is the hardest layer for startups: capital-heavy, slow, and financed with debt."]]
+  }
+];
+
+const PLAYERS = [
+  ["OpenAI", false, { L1: "Stargate", L5: "GPT models", L7: "Agents SDK", L8: "Codex", L9: "ChatGPT" }],
+  ["Anthropic", false, { L5: "Claude models", L7: "MCP, Managed Agents", L8: "Claude Code", L9: "Claude app" }],
+  ["Google", false, { L2: "TPU", L3: "Google Cloud", L5: "Gemini", L6: "Vertex", L7: "Managed Agents", L9: "Gemini, Android, Chrome" }],
+  ["Microsoft", false, { L3: "Azure", L6: "AI Foundry", L8: "M365 Copilot, GitHub Copilot", L9: "Windows, Copilot" }],
+  ["Amazon", false, { L2: "Trainium", L3: "AWS", L6: "Bedrock", L7: "Agent runtime" }],
+  ["Nvidia", false, { L2: "GPUs, NVLink", L3: "DGX Cloud", L6: "Dynamo" }],
+  ["Meta", false, { L1: "Own data centers", L5: "Llama", L9: "Meta AI, WhatsApp, glasses" }],
+  ["xAI", false, { L1: "Colossus", L5: "Grok models", L9: "Grok app" }],
+  ["Alibaba", true, { L3: "Alibaba Cloud", L5: "Qwen", L9: "Qwen app" }],
+  ["ByteDance", true, { L3: "Volcano Engine", L5: "Seed models", L9: "Doubao" }]
+];
+
+const PATTERNS = [
+  ["Capital-heavy layers end with 2–3 winners", "When a layer needs billions in fixed costs, scale decides it. Startups rarely win there head-on.", "L1 · L3 · L5"],
+  ["The biggest buyers become their own suppliers", "Once a customer is big enough, it builds the layer directly beneath it.", "TPU, Trainium (L2) · labs' own agent runtimes (L7)"],
+  ["Cheap and open beats premium only under three conditions", "The work can be split up, the premium product gives more than buyers need, and the incumbent hesitates. Inference chips fit best; training chips don't.", "L2 · open weights in L5 (partly)"],
+  ["Thin control layers get bought by adjacent giants", "Routers, gateways and observability sit next to companies that already own the customer, and those companies buy them early.", "OpenRouter → Stripe · Portkey → Palo Alto · Arize → Dynatrace"],
+  ["Open standards are free on purpose; the money is in the managed service", "The creator of a standard rarely profits from the standard itself (Docker). Companies that win sell hosting, support and tooling around it.", "MCP · vLLM · SGLang · LangChain"],
+  ["Neutrality is a moat", "Suppliers tied to one rival lose the others' business. Being neutral across models, chips or clouds is a defense.", "Surge and Mercor after Scale–Meta (L4) · Mistral (L5) · Fireworks, Baseten (L6)"],
+  ["Openings appear where something new is scarce", "New startups get in where a new bottleneck appears, not where incumbents already serve the need.", "Chip variety · memory for long agent context · new modalities · custom models"],
+  ["Overbuilding bankrupts builders; the next wave rides cheap", "Debt-funded capacity booms end in busts, and the survivors and newcomers get the capacity cheap.", "L1 · L3 refinancing wall"]
+];
+
+const legend = document.getElementById("legend");
+const map = document.getElementById("map");
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+// counts
+const counts = {};
+LAYERS.forEach(L => L.op.forEach(o => { counts[o[0]] = (counts[o[0]] || 0) + 1; }));
+
+Object.entries(STATUSES).forEach(([k, s]) => {
+  const b = el("button", "fbtn");
+  b.type = "button";
+  b.dataset.s = k;
+  b.setAttribute("aria-pressed", "false");
+  b.append(el("span", "g", s.g), el("span", null, s.label), el("span", "n", String(counts[k] || 0)));
+  b.addEventListener("click", () => setFilter(map.dataset.filter === k ? null : k));
+  legend.append(b);
+});
+const reset = el("button", "fbtn reset", "Show all");
+reset.type = "button";
+reset.addEventListener("click", () => setFilter(null));
+legend.append(reset);
+legend.append(el("span", "legend-note", "Startup odds in the Layer column come from the history-based scoring we did: which layers past waves left open to startups."));
+
+function setFilter(k) {
+  if (k) map.dataset.filter = k; else delete map.dataset.filter;
+  legend.querySelectorAll(".fbtn[data-s]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.s === k)));
+}
+
+LAYERS.forEach((L, i) => {
+  const row = el("div", "row");
+
+  const lc = el("div", "cell layer");
+  lc.style.setProperty("--tint", (3 + i * 2.2) + "%"); // deeper tint toward the physical layers at the bottom
+  lc.append(el("div", "lnum", L.n), el("div", "lname", L.name), el("div", "lsub", L.sub));
+  const od = el("div", "odds");
+  od.dataset.odds = L.odds[0];
+  od.append(el("span", "ok", "Startup odds"), el("span", "ov", L.odds[1]), el("span", null, L.odds[2]));
+  lc.append(od);
+
+  const wc = el("div", "cell");
+  wc.append(el("div", "cell-label", "What's in it"), el("p", "what", L.what));
+
+  const ec = el("div", "cell");
+  ec.append(el("div", "cell-label", "Examples"));
+  const ex = el("div", "ex");
+  L.ex.forEach(([k, v]) => { const d = el("div"); d.append(el("span", "k", k), document.createTextNode(v)); ex.append(d); });
+  if (L.cn) { const d = el("div", "cn"); d.append(el("span", "k", "China"), document.createTextNode(L.cn)); ex.append(d); }
+  ec.append(ex);
+
+  const rc = el("div", "cell");
+  rc.append(el("div", "cell-label", "Rhymes with"));
+  const rh = el("div", "rh");
+  L.rh.forEach(([era, t]) => { const d = el("div", "rh-item"); d.append(el("span", "rh-era", era), el("span", "rh-text", t)); rh.append(d); });
+  rc.append(rh);
+
+  const oc = el("div", "cell");
+  oc.append(el("div", "cell-label", "New opportunities"));
+  const ops = el("div", "opps");
+  L.op.forEach(([s, nm, nt]) => {
+    const c = el("div", "chip");
+    c.dataset.s = s;
+    const g = el("span", "g", STATUSES[s].g);
+    g.title = STATUSES[s].label;
+    c.append(g, el("span", "nm", nm), el("span", "nt", nt));
+    ops.append(c);
+  });
+  oc.append(ops);
+
+  row.append(lc, wc, ec, rc, oc);
+  map.append(row);
+});
+
+// players table
+const COLS = ["L1","L2","L3","L4","L5","L6","L7","L8","L9"];
+const tbl = document.getElementById("span");
+const thead = el("tr");
+thead.append(el("th", "pl", "Company"));
+COLS.forEach(c => thead.append(el("th", null, c)));
+tbl.append(thead);
+PLAYERS.forEach(([name, cn, m]) => {
+  const tr = el("tr");
+  const td = el("td", "pl", name);
+  if (cn) td.append(el("span", "cn", "China"));
+  tr.append(td);
+  COLS.forEach(c => {
+    if (m[c]) { const t = el("td", "on"); t.append(el("span", null, m[c])); tr.append(t); }
+    else { const t = el("td", "off"); t.setAttribute("aria-label", "none"); tr.append(t); }
+  });
+  tbl.append(tr);
+});
+
+// patterns
+const pw = document.getElementById("patterns");
+PATTERNS.forEach(([h, p, w], i) => {
+  const d = el("div", "pat");
+  d.append(el("div", "pn", "Pattern " + String(i + 1).padStart(2, "0")), el("h3", null, h), el("p", null, p), el("div", "where", w));
+  pw.append(d);
+});
+</script>
+</body>
+</html>
