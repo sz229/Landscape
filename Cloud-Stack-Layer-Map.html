@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Stack Layer Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a stack diagram turned into a matrix. Rows are layers (physical at the bottom, customers at the top),
+   columns are three snapshots in time plus the reason each layer ended the way it did. Chips carry their eventual fate. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #15202b;
+  --muted: #5b6877;
+  --line: #d5dce3;
+  --accent: #2a5b88;
+
+  --won: #1d7f47;
+  --held: #0f7480;
+  --acq: #a86c12;
+  --faded: #7d705e;
+  --shut: #b8392f;
+  --std: #6b45b0;
+
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141a;
+    --surface: #161f28;
+    --ink: #e5ebf1;
+    --muted: #9aa8b6;
+    --line: #2a3643;
+    --accent: #7eaedc;
+    --won: #4cc07f;
+    --held: #3db6c0;
+    --acq: #dfa449;
+    --faded: #b2a58f;
+    --shut: #ee6b62;
+    --std: #a98ae6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141a;
+  --surface: #161f28;
+  --ink: #e5ebf1;
+  --muted: #9aa8b6;
+  --line: #2a3643;
+  --accent: #7eaedc;
+  --won: #4cc07f;
+  --held: #3db6c0;
+  --acq: #dfa449;
+  --faded: #b2a58f;
+  --shut: #ee6b62;
+  --std: #a98ae6;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1320px; margin: 0 auto; padding: 32px 24px 64px; }
+@media (max-width: 500px) { .wrap { padding: 24px 16px 48px; } }
+
+header.top { display: grid; gap: 10px; max-width: 760px; }
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 3.4vw, 38px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+.lede { margin: 0; color: var(--muted); font-size: 16px; max-width: 66ch; }
+
+/* Legend / filter */
+.legend {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.legend-label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+.fbtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font: 500 13px/1 var(--font-body);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px 7px 10px;
+  cursor: pointer;
+}
+.fbtn:hover { border-color: var(--muted); }
+.fbtn[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.fbtn .g { font-size: 12px; width: 12px; text-align: center; }
+.fbtn .n { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fbtn.reset { color: var(--muted); }
+.legend-note { flex-basis: 100%; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* outcome colors */
+[data-o="won"]   { --oc: var(--won); }
+[data-o="held"]  { --oc: var(--held); }
+[data-o="acq"]   { --oc: var(--acq); }
+[data-o="faded"] { --oc: var(--faded); }
+[data-o="shut"]  { --oc: var(--shut); }
+[data-o="std"]   { --oc: var(--std); }
+.g { color: var(--oc); }
+
+/* The map */
+.map {
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 190px repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr);
+}
+.row + .row { border-top: 1px solid var(--line); }
+.cell { padding: 14px; min-width: 0; }
+.cell + .cell { border-left: 1px solid var(--line); }
+
+.row.head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px 10px 0 0;
+}
+.row.head .cell { padding-top: 14px; padding-bottom: 12px; }
+.era-yr { font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 500; }
+.era-name { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 2px 0 4px; }
+.era-desc { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.head-why .era-name { margin-top: 18px; }
+
+.cell.layer {
+  background: color-mix(in srgb, var(--accent) var(--tint), var(--surface));
+  display: grid; align-content: start; gap: 4px;
+}
+.lnum { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); font-weight: 500; }
+.lname { font-family: var(--font-display); font-weight: 600; font-size: 16.5px; line-height: 1.2; text-wrap: balance; }
+.lsub { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+.snap { display: flex; flex-direction: column; gap: 6px; }
+.snap-label { display: none; }
+
+.chip {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 6px;
+  padding: 6px 9px 6px 7px;
+  border-left: 3px solid var(--oc);
+  background: color-mix(in srgb, var(--oc) 7%, var(--surface));
+  border-radius: 3px 6px 6px 3px;
+  transition: opacity .15s ease;
+}
+.chip .g { font-size: 11px; line-height: 20px; text-align: center; }
+.chip .nm { font-weight: 600; font-size: 13.5px; line-height: 20px; overflow-wrap: anywhere; }
+.chip .nt {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.map[data-filter] .chip { opacity: .22; }
+.map[data-filter="won"]   .chip[data-o="won"],
+.map[data-filter="held"]  .chip[data-o="held"],
+.map[data-filter="acq"]   .chip[data-o="acq"],
+.map[data-filter="faded"] .chip[data-o="faded"],
+.map[data-filter="shut"]  .chip[data-o="shut"],
+.map[data-filter="std"]   .chip[data-o="std"] { opacity: 1; }
+
+.why { font-size: 13.5px; line-height: 1.5; }
+.why .tag {
+  display: inline-block;
+  font-family: var(--font-display); font-weight: 600; font-size: 14px;
+  margin-bottom: 4px; color: var(--ink);
+}
+.why p { margin: 0; color: var(--muted); }
+
+.read-hint { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
+
+/* Narrow screens: each layer becomes a card */
+@media (max-width: 1020px) {
+  .row { grid-template-columns: 1fr; }
+  .row.head { display: none; }
+  .cell + .cell { border-left: 0; border-top: 1px solid var(--line); }
+  .snap-label {
+    display: block;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .snap { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+  .snap-label { grid-column: 1 / -1; }
+  .row + .row { border-top: 6px solid var(--bg); }
+}
+
+/* Sections below the map */
+section.block { margin-top: 44px; }
+h2 {
+  font-family: var(--font-display); font-weight: 700; font-size: 22px;
+  margin: 0 0 6px; letter-spacing: -0.005em; text-wrap: balance;
+}
+.section-lede { margin: 0 0 16px; color: var(--muted); max-width: 66ch; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.stat .v { font-family: var(--font-display); font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 13px; color: var(--muted); }
+
+.patterns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.pat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.pat .pn { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); }
+.pat h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; line-height: 1.25; text-wrap: balance; }
+.pat p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.pat .where { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+.qs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.q { border-top: 3px solid var(--accent); background: var(--surface); border-radius: 0 0 8px 8px; padding: 12px 16px 14px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.q h3 { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; margin: 0 0 4px; }
+.q p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+.sources { font-size: 13px; color: var(--muted); }
+.sources ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.sources a { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) { .chip { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="kicker">Tech-wave case study · 2006–2020</div>
+    <h1>The cloud stack, layer by layer</h1>
+    <p class="lede">Who was in each layer of the cloud stack at three points in time, what eventually happened to them, and the main reason each layer turned out the way it did. Read from the bottom up: buildings and chips at the bottom, software customers use at the top.</p>
+  </header>
+
+  <div class="legend" id="legend" role="group" aria-label="Highlight companies by outcome">
+    <span class="legend-label">Highlight:</span>
+  </div>
+
+  <div class="map" id="map"></div>
+  <p class="read-hint">Rows run top to bottom from customer-facing apps (L8) down to physical buildings (L1).</p>
+
+  <section class="block" aria-labelledby="numbers-h">
+    <h2 id="numbers-h">Where it ended up in 2020</h2>
+    <p class="section-lede">A few numbers show how concentrated the rented-compute layer became.</p>
+    <div class="stats">
+      <div class="stat"><div class="v">$3.1B → $45.4B</div><div class="l">AWS annual revenue, 2013 to 2020</div></div>
+      <div class="stat"><div class="v">32% · 20% · 9%</div><div class="l">AWS, Azure and Google share of cloud infrastructure services, Q4 2020 (Synergy Research)</div></div>
+      <div class="stat"><div class="v">−13 points</div><div class="l">Market share lost by the long tail of smaller providers over the 16 quarters to Q4 2020 (Synergy Research)</div></div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="patterns-h">
+    <h2 id="patterns-h">Patterns that cut across layers</h2>
+    <p class="section-lede">These are the parts of the story that are most likely to repeat in the next wave.</p>
+    <div class="patterns" id="patterns"></div>
+  </section>
+
+  <section class="block" aria-labelledby="qs-h">
+    <h2 id="qs-h">Three questions to ask of any layer</h2>
+    <p class="section-lede">Most of the outcomes above follow from the answers to these.</p>
+    <div class="qs">
+      <div class="q"><h3>How much capital does it take to compete?</h3><p>Heavy, ongoing capital spending leaves room for only two or three winners (L1, L4). Light layers stay crowded (L7, L8).</p></div>
+      <div class="q"><h3>Can open source make it free?</h3><p>If yes, the layer becomes a standard and the value moves to whoever runs it as a service or sells support (L3, L5).</p></div>
+      <div class="q"><h3>How hard is it for a customer to leave?</h3><p>Data and daily workflows hold customers in place (L6, L8). Raw compute does not, so it competes on scale and price (L4).</p></div>
+    </div>
+  </section>
+
+  <section class="block sources" aria-labelledby="src-h">
+    <h2 id="src-h">Sources</h2>
+    <p class="section-lede" style="margin-bottom:0">Spot-checked figures are linked below. Other dates and deal values come from public announcements; check them before quoting.</p>
+    <ul>
+      <li><a href="https://channelfutures.com/cloud/amazon-com-breaks-out-aws-cloud-revenues-for-first-time-in-q1-report">Channel Futures: Amazon breaks out AWS revenue for the first time (2013 and 2014 figures)</a></li>
+      <li><a href="https://datacenterdynamics.com/en/news/earnings-results-reveal-microsoft-gaining-amazon-pulling-away-google">DCD: Q4 2020 cloud earnings and Synergy market shares</a></li>
+      <li><a href="https://m.digitalisationworld.com/news/60705/cloud-market-ends-2020-on-a-high">Digitalisation World: Synergy Q4 2020, smaller providers lost 13 points</a></li>
+      <li><a href="https://www.datacenterdynamics.com/en/news/cisco-to-end-intercloud-public-cloud-next-march/">DCD: Cisco ends Intercloud public cloud</a></li>
+      <li><a href="https://www.serverwatch.com/server-news/ibm-acquires-verizons-cloud-and-hosting-business.html">ServerWatch: Verizon sells cloud business to IBM and data centers to Equinix</a></li>
+      <li><a href="https://androidcentral.com/facebook-shutting-down-its-parse-developer-platform">Android Central: Facebook shuts down Parse</a></li>
+      <li><a href="https://siliconangle.com/2017/04/05/vmware-exits-hybrid-cloud-hosting-business-sale-vcloud-air-ovh/">SiliconANGLE: VMware sells vCloud Air to OVH</a></li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+const OUTCOMES = [
+  { k: "won",   g: "▲", label: "Won" },
+  { k: "held",  g: "●", label: "Held on / niche" },
+  { k: "acq",   g: "→", label: "Acquired" },
+  { k: "faded", g: "▼", label: "Faded" },
+  { k: "shut",  g: "✕", label: "Shut down / exited" },
+  { k: "std",   g: "◆", label: "Became a free standard" }
+];
+const GLYPH = Object.fromEntries(OUTCOMES.map(o => [o.k, o.g]));
+const LABEL = Object.fromEntries(OUTCOMES.map(o => [o.k, o.label]));
+
+const ERAS = [
+  { yr: "~2008", name: "It's a toy", desc: "AWS is nearly alone. Startups use it; enterprises call it insecure and rivals dismiss it." },
+  { yr: "~2013", name: "Everyone launches a cloud", desc: "Telcos, hardware makers and VMware launch clouds. OpenStack, PaaS and Hadoop are the hype." },
+  { yr: "~2020", name: "Shakeout", desc: "Three clouds hold most of the market. Copycats have exited; independents above the clouds go public." }
+];
+
+/* chip: [name, outcome, note] */
+const LAYERS = [
+  {
+    n: "L8", name: "Apps built on the cloud", sub: "SaaS and consumer apps that rent the whole stack",
+    c: [
+      [["Salesforce","won","SaaS pioneer, founded 1999"],["NetSuite","acq","→ Oracle 2016, $9.3B"],["Netflix","won","starts moving to AWS after a 2008 database outage"],["Dropbox","held","launches 2008, stores files on S3"]],
+      [["Workday","won","IPO 2012"],["ServiceNow","won","IPO 2012"],["Box","held","IPO 2015"],["Slack","acq","launches 2013"],["Zoom","won","launches 2013"]],
+      [["Zoom","won","IPO 2019, pandemic surge"],["Shopify","won","merchants run on its platform"],["Slack","acq","→ Salesforce, $27.7B (announced Dec 2020)"],["Netflix","won","all-in on AWS by 2016"],["Dropbox","held","moved most storage off AWS in 2016 to cut costs"]]
+    ],
+    tag: "Owning a workflow, not infrastructure",
+    why: "Cheap cloud made starting easy, so this layer got crowded fast. The winners became a daily habit or the system of record for a business. At large scale a few moved off the cloud to save money (Dropbox)."
+  },
+  {
+    n: "L7", name: "Developer, ops & security tools", sub: "Monitoring, code hosting, identity, security, edge",
+    c: [
+      [["GitHub","acq","founded 2008 → Microsoft 2018, $7.5B"],["Splunk","acq","IPO 2012 → Cisco 2024"],["New Relic","acq","founded 2008, taken private 2023"],["RightScale","acq","multi-cloud management → Flexera 2018"],["Akamai","held","CDN incumbent since 1998"]],
+      [["Datadog","won","founded 2010"],["Cloudflare","won","founded 2009"],["HashiCorp","acq","Terraform 2014 → IBM 2025"],["Twilio","won","APIs as a product, IPO 2016"],["Okta","won","cloud identity, IPO 2017"]],
+      [["Datadog","won","IPO 2019, one dashboard across all clouds"],["Cloudflare","won","IPO 2019"],["CrowdStrike","won","cloud-native security, IPO 2019"],["Zscaler","won","IPO 2018"],["Fastly","held","IPO 2019"],["Terraform","std","the common way to script any cloud (license changed 2023)"]]
+    ],
+    tag: "Neutrality across clouds",
+    why: "Most companies used more than one cloud and wanted one tool for all of them. Engineers adopted these tools bottom-up, and usage pricing grew with cloud spend. The clouds' built-in tools were cheap but rarely the best."
+  },
+  {
+    n: "L6", name: "Data & databases", sub: "Storage, databases, warehouses, analytics",
+    c: [
+      [["Amazon S3","won","2006, the first AWS service"],["Oracle","held","on-prem database leader, late to cloud"],["MySQL","acq","→ Sun 2008 → Oracle 2010"],["Hadoop","std","open-source big-data stack"],["Cloudera","faded","founded 2008 to sell Hadoop"]],
+      [["AWS RDS · DynamoDB · Redshift","won","2009 · 2012 · 2012"],["MongoDB","won","NoSQL boom"],["Hortonworks","acq","IPO 2014, merged into Cloudera 2019"],["Snowflake","won","founded 2012"],["Databricks","won","founded 2013"]],
+      [["Snowflake","won","IPO Sep 2020; runs on AWS, Azure and Google while competing with each"],["MongoDB Atlas","won","IPO 2017; 2018 license change aimed at cloud resellers"],["Databricks","won","private, built on Spark"],["Amazon Aurora","won","launched 2014"],["Cloudera","faded","taken private 2021"]]
+    ],
+    tag: "Data gravity",
+    why: "Once data sits somewhere, moving it is slow and costly, so this layer had the stickiest customers. Independents beat the clouds' own products by being clearly better (Snowflake split storage from compute) and by working on every cloud. Hadoop sellers lost when cheap cloud storage replaced their on-prem clusters."
+  },
+  {
+    n: "L5", name: "App platforms (PaaS & serverless)", sub: "Run my code; don't make me manage servers",
+    c: [
+      [["Heroku","acq","→ Salesforce 2010, $212M"],["Google App Engine","held","preview 2008"],["Engine Yard","faded","Rails hosting"],["Force.com","held","Salesforce's own platform"]],
+      [["Parse","shut","→ Facebook 2013, $85M; shut Jan 2017"],["Firebase","acq","→ Google 2014"],["Cloud Foundry","std","open source; VMware 2011, then Pivotal"],["Pivotal","acq","IPO 2018 → back into VMware 2019"],["dotCloud","shut","team pivoted to Docker in 2013; PaaS sold off"],["AWS Elastic Beanstalk","held","2011"]],
+      [["AWS Lambda","won","2014, serverless functions"],["Firebase","acq","thrives inside Google"],["Vercel","held","front-end niche, founded 2015 as Zeit"],["Netlify","held","front-end niche"],["Heroku","faded","growth slowed inside Salesforce"]]
+    ],
+    tag: "Easy at the start, outgrown later",
+    why: "PaaS made the first app simple but boxed in growing companies, which moved down to raw servers. The clouds then rebuilt the idea themselves (Lambda, App Engine, Cloud Run). Later winners picked one audience: front-end developers."
+  },
+  {
+    n: "L4", name: "Rented compute (IaaS)", sub: "Virtual servers, storage and networks by the hour",
+    c: [
+      [["Amazon EC2","won","beta 2006, nearly alone"],["Microsoft Azure","won","announced Oct 2008"],["Rackspace","faded","bought Slicehost 2008"],["Joyent","acq","→ Samsung 2016"],["Linode","acq","→ Akamai 2022"],["GoGrid","acq","→ Datapipe 2015"]],
+      [["Microsoft Azure","won","GA 2010; Nadella becomes CEO 2014"],["Google Compute Engine","won","GA Dec 2013"],["IBM SoftLayer","faded","bought 2013, ~$2B"],["Verizon Terremark","shut","bought 2011, $1.4B; exited 2017"],["HP Helion","shut","OpenStack public cloud, shut 2016"],["Cisco Intercloud","shut","launched 2014 with ~$1B; shut Mar 2017"],["DigitalOcean","held","founded 2011, serves small developers"]],
+      [["AWS","won","32% share, Q4 2020"],["Microsoft Azure","won","20%"],["Google Cloud","won","9%"],["Alibaba Cloud","held","leader in China"],["Oracle Cloud (OCI)","held","second attempt"],["Rackspace","faded","taken private 2016 ($4.3B); now manages AWS and Azure for clients"],["IBM Cloud","faded","lost share to the big three"]]
+    ],
+    tag: "Scale",
+    why: "Each round of capital spending lowered unit costs and paid for new services, and AWS shipped services faster than rivals could copy them. Microsoft took second place through its existing enterprise contracts. Telcos, hardware makers and hosting firms that copied AWS mostly quit in 2016–2017."
+  },
+  {
+    n: "L3", name: "Virtualization & orchestration", sub: "Software that slices servers and schedules workloads",
+    c: [
+      [["VMware","held","IPO 2007 → Broadcom 2023, ~$69B"],["Xen","std","open source; early AWS ran on it"],["XenSource","acq","→ Citrix 2007, $500M"],["KVM (Qumranet)","acq","→ Red Hat 2008; KVM became a standard"]],
+      [["OpenStack","faded","2010, Rackspace + NASA; failed as a public-cloud base"],["Docker","std","2013; the standard spread, the company struggled"],["Mesosphere","faded","renamed D2iQ 2019"],["VMware vCloud Air","shut","sold to OVH 2017"],["Red Hat","acq","→ IBM 2019, $34B"]],
+      [["Kubernetes","std","Google 2014, donated to CNCF"],["EKS · GKE · AKS","won","clouds sell Kubernetes as a managed service"],["Red Hat OpenShift","won","enterprise Kubernetes, inside IBM"],["AWS Nitro","won","AWS's own hypervisor and hardware, 2017"],["Docker Enterprise","acq","→ Mirantis 2019"],["CoreOS · Heptio","acq","→ Red Hat 2018 · → VMware 2018"]]
+    ],
+    tag: "Open source makes it a free standard",
+    why: "The company that created the standard often failed to profit from it (Docker). The money went to clouds that ran it as a managed service, to companies selling enterprise support (Red Hat), and to the incumbent with a huge installed base (VMware)."
+  },
+  {
+    n: "L2", name: "Chips, servers & networking", sub: "The hardware inside the buildings",
+    c: [
+      [["Intel Xeon","held","dominant; lost share after 2017"],["Dell · HP · IBM servers","faded","lost hyperscale buyers to contract makers"],["Cisco","held","kept enterprise, lost hyperscale switching"],["Google custom servers","won","built its own from the start"]],
+      [["Open Compute Project","std","Facebook 2011, open server designs"],["Quanta · Wiwynn (ODMs)","won","build servers to hyperscaler specs"],["Arista","won","IPO 2014, switches for hyperscalers"],["Broadcom switch chips","won","merchant silicon for white-box switches"]],
+      [["AWS Nitro · Graviton","won","via Annapurna Labs, bought 2015"],["Google TPU","won","announced 2016"],["AMD EPYC","won","2017 server comeback"],["Nvidia data-center GPUs","won","early AI training demand"]]
+    ],
+    tag: "The biggest buyers became their own suppliers",
+    why: "Hyperscalers bought at such volume that they designed their own servers, then their own chips. Branded server makers lost these customers. Component makers that sold straight to the hyperscalers (Arista, Broadcom, Quanta) won."
+  },
+  {
+    n: "L1", name: "Data centers & connectivity", sub: "Land, power, cooling and the places networks meet",
+    c: [
+      [["Equinix","won","neutral colocation where networks interconnect"],["Digital Realty","won","wholesale data-center space"],["Savvis","acq","→ CenturyLink 2011, $2.5B"],["Terremark","acq","→ Verizon 2011, $1.4B"],["Company-owned data centers","faded","enterprises start moving out"]],
+      [["Telco-owned data centers","faded","bought to sell cloud services"],["Hyperscaler campuses","won","AWS, Microsoft, Google build their own"],["Equinix","won","converts to a REIT in 2015"]],
+      [["Equinix","won","buys 29 Verizon data centers, 2017, $3.6B"],["Cyxtera","shut","CenturyLink's data centers, sold 2017; bankrupt 2023"],["Digital Realty","won","keeps growing with hyperscale leases"],["Hyperscaler self-build","won","build most capacity, lease the rest"]]
+    ],
+    tag: "A network effect you can stand in",
+    why: "Each Equinix site got more valuable as more networks and clouds connected there. Telcos bought data centers to sell cloud services and sold them about six years later. The hyperscalers built most of their own capacity and leased the rest."
+  }
+];
+
+const PATTERNS = [
+  { t: "Capital-heavy layers end with two or three winners", p: "Rented compute went from dozens of providers to AWS, Azure and Google. Scale lowered cost, and lower cost won more scale.", w: "L4 · L1" },
+  { t: "Open source turns a layer into a free standard", p: "Virtualization, then containers, then Kubernetes. The value moved to whoever ran it as a service or sold support.", w: "L3 · L5" },
+  { t: "The biggest customers become suppliers", p: "Hyperscalers designed their own servers, then their own chips, and cut out the branded vendors.", w: "L2" },
+  { t: "Independents win above the giants by being neutral", p: "Snowflake, Datadog and MongoDB ran on every cloud and owned data or workflow the clouds could not easily copy.", w: "L6 · L7" },
+  { t: "Easy platforms get outgrown, then copied", p: "First-generation PaaS was acquired or shut. The clouds rebuilt the idea themselves as serverless.", w: "L5" },
+  { t: "Incumbents that copy the leader lose; those that partner survive", p: "HP, Cisco, Verizon and VMware all launched clouds and quit. VMware then partnered with AWS (2016) and Rackspace became a manager of other clouds.", w: "L4 · L3" },
+  { t: "The incumbent with distribution can come back", p: "Microsoft was late, but turned its enterprise contracts into the number-two cloud.", w: "L4" }
+];
+
+/* Build legend */
+const counts = {};
+LAYERS.forEach(L => L.c.forEach(col => col.forEach(ch => { counts[ch[1]] = (counts[ch[1]] || 0) + 1; })));
+const legend = document.getElementById("legend");
+const map = document.getElementById("map");
+OUTCOMES.forEach(o => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "fbtn";
+  b.id = "f-" + o.k;
+  b.dataset.o = o.k;
+  b.setAttribute("aria-pressed", "false");
+  b.innerHTML = '<span class="g" aria-hidden="true">' + o.g + '</span>' + o.label + ' <span class="n">' + (counts[o.k] || 0) + '</span>';
+  b.addEventListener("click", () => setFilter(map.dataset.filter === o.k ? null : o.k));
+  legend.appendChild(b);
+});
+const reset = document.createElement("button");
+reset.type = "button"; reset.className = "fbtn reset"; reset.id = "f-all"; reset.textContent = "Show all";
+reset.addEventListener("click", () => setFilter(null));
+legend.appendChild(reset);
+const note = document.createElement("div");
+note.className = "legend-note";
+note.textContent = "Each company is marked with what eventually happened to it, so a chip in the 2008 column can show a 2016 outcome.";
+legend.appendChild(note);
+
+function setFilter(k) {
+  if (k) map.dataset.filter = k; else delete map.dataset.filter;
+  legend.querySelectorAll(".fbtn[data-o]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.o === k)));
+}
+
+/* Build map */
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+let html = '<div class="row head"><div class="cell"><div class="era-yr">Layer</div><div class="era-name">Stack</div><div class="era-desc">Top: what customers touch. Bottom: what it runs on.</div></div>';
+ERAS.forEach(e => {
+  html += '<div class="cell"><div class="era-yr">' + e.yr + '</div><div class="era-name">' + esc(e.name) + '</div><div class="era-desc">' + esc(e.desc) + '</div></div>';
+});
+html += '<div class="cell head-why"><div class="era-yr">Outcome</div><div class="era-name" style="margin-top:2px">What decided it</div><div class="era-desc">The main reason the layer ended up the way it did.</div></div></div>';
+
+LAYERS.forEach((L, i) => {
+  const tint = 3 + i * 2.2; /* deeper tint toward the physical layers at the bottom */
+  html += '<div class="row" id="layer-' + L.n.toLowerCase() + '">';
+  html += '<div class="cell layer" style="--tint:' + tint.toFixed(1) + '%"><div class="lnum">' + L.n + '</div><div class="lname">' + esc(L.name) + '</div><div class="lsub">' + esc(L.sub) + '</div></div>';
+  L.c.forEach((col, ci) => {
+    html += '<div class="cell snap"><div class="snap-label">' + ERAS[ci].yr + ' · ' + esc(ERAS[ci].name) + '</div>';
+    col.forEach(ch => {
+      html += '<div class="chip" data-o="' + ch[1] + '" title="' + LABEL[ch[1]] + '"><span class="g" aria-label="' + LABEL[ch[1]] + '">' + GLYPH[ch[1]] + '</span><span class="nm">' + esc(ch[0]) + '</span>' + (ch[2] ? '<span class="nt">' + esc(ch[2]) + '</span>' : '') + '</div>';
+    });
+    html += '</div>';
+  });
+  html += '<div class="cell why"><span class="tag">' + esc(L.tag) + '</span><p>' + esc(L.why) + '</p></div>';
+  html += '</div>';
+});
+map.innerHTML = html;
+
+/* Patterns */
+document.getElementById("patterns").innerHTML = PATTERNS.map((p, i) =>
+  '<div class="pat"><div class="pn">Pattern ' + (i + 1) + '</div><h3>' + esc(p.t) + '</h3><p>' + esc(p.p) + '</p><div class="where">Seen in ' + p.w + '</div></div>'
+).join("");
+</script>
+</body>
+</html>
