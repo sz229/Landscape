@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internet Era Layer Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a stack diagram turned into a matrix. Rows are layers (physical at the bottom, customers at the top),
+   columns are three snapshots in time plus the reason each layer ended the way it did. Chips carry their eventual fate. */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --ink: #15202b;
+  --muted: #5b6877;
+  --line: #d5dce3;
+  --accent: #2a5b88;
+
+  --won: #1d7f47;
+  --held: #0f7480;
+  --acq: #a86c12;
+  --faded: #7d705e;
+  --shut: #b8392f;
+  --std: #6b45b0;
+
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e141a;
+    --surface: #161f28;
+    --ink: #e5ebf1;
+    --muted: #9aa8b6;
+    --line: #2a3643;
+    --accent: #7eaedc;
+    --won: #4cc07f;
+    --held: #3db6c0;
+    --acq: #dfa449;
+    --faded: #b2a58f;
+    --shut: #ee6b62;
+    --std: #a98ae6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e141a;
+  --surface: #161f28;
+  --ink: #e5ebf1;
+  --muted: #9aa8b6;
+  --line: #2a3643;
+  --accent: #7eaedc;
+  --won: #4cc07f;
+  --held: #3db6c0;
+  --acq: #dfa449;
+  --faded: #b2a58f;
+  --shut: #ee6b62;
+  --std: #a98ae6;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1320px; margin: 0 auto; padding: 32px 24px 64px; }
+@media (max-width: 500px) { .wrap { padding: 24px 16px 48px; } }
+
+header.top { display: grid; gap: 10px; max-width: 760px; }
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 3.4vw, 38px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+.lede { margin: 0; color: var(--muted); font-size: 16px; max-width: 66ch; }
+
+/* Legend / filter */
+.legend {
+  margin-top: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.legend-label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+.fbtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font: 500 13px/1 var(--font-body);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px 7px 10px;
+  cursor: pointer;
+}
+.fbtn:hover { border-color: var(--muted); }
+.fbtn[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.fbtn .g { font-size: 12px; width: 12px; text-align: center; }
+.fbtn .n { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fbtn.reset { color: var(--muted); }
+.legend-note { flex-basis: 100%; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* outcome colors */
+[data-o="won"]   { --oc: var(--won); }
+[data-o="held"]  { --oc: var(--held); }
+[data-o="acq"]   { --oc: var(--acq); }
+[data-o="faded"] { --oc: var(--faded); }
+[data-o="shut"]  { --oc: var(--shut); }
+[data-o="std"]   { --oc: var(--std); }
+.g { color: var(--oc); }
+
+/* The map */
+.map {
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.row {
+  display: grid;
+  grid-template-columns: 190px repeat(3, minmax(0, 1fr)) minmax(0, 1.25fr);
+}
+.row + .row { border-top: 1px solid var(--line); }
+.cell { padding: 14px; min-width: 0; }
+.cell + .cell { border-left: 1px solid var(--line); }
+
+.row.head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px 10px 0 0;
+}
+.row.head .cell { padding-top: 14px; padding-bottom: 12px; }
+.era-yr { font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 500; }
+.era-name { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 2px 0 4px; }
+.era-desc { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.head-why .era-name { margin-top: 18px; }
+
+.cell.layer {
+  background: color-mix(in srgb, var(--accent) var(--tint), var(--surface));
+  display: grid; align-content: start; gap: 4px;
+}
+.lnum { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); font-weight: 500; }
+.lname { font-family: var(--font-display); font-weight: 600; font-size: 16.5px; line-height: 1.2; text-wrap: balance; }
+.lsub { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+
+.snap { display: flex; flex-direction: column; gap: 6px; }
+.snap-label { display: none; }
+
+.chip {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 6px;
+  padding: 6px 9px 6px 7px;
+  border-left: 3px solid var(--oc);
+  background: color-mix(in srgb, var(--oc) 7%, var(--surface));
+  border-radius: 3px 6px 6px 3px;
+  transition: opacity .15s ease;
+}
+.chip .g { font-size: 11px; line-height: 20px; text-align: center; }
+.chip .nm { font-weight: 600; font-size: 13.5px; line-height: 20px; overflow-wrap: anywhere; }
+.chip .nt {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.map[data-filter] .chip { opacity: .22; }
+.map[data-filter="won"]   .chip[data-o="won"],
+.map[data-filter="held"]  .chip[data-o="held"],
+.map[data-filter="acq"]   .chip[data-o="acq"],
+.map[data-filter="faded"] .chip[data-o="faded"],
+.map[data-filter="shut"]  .chip[data-o="shut"],
+.map[data-filter="std"]   .chip[data-o="std"] { opacity: 1; }
+
+.why { font-size: 13.5px; line-height: 1.5; }
+.why .tag {
+  display: inline-block;
+  font-family: var(--font-display); font-weight: 600; font-size: 14px;
+  margin-bottom: 4px; color: var(--ink);
+}
+.why p { margin: 0; color: var(--muted); }
+
+.read-hint { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
+
+/* Narrow screens: each layer becomes a card */
+@media (max-width: 1020px) {
+  .row { grid-template-columns: 1fr; }
+  .row.head { display: none; }
+  .cell + .cell { border-left: 0; border-top: 1px solid var(--line); }
+  .snap-label {
+    display: block;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .snap { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+  .snap-label { grid-column: 1 / -1; }
+  .row + .row { border-top: 6px solid var(--bg); }
+}
+
+/* Sections below the map */
+section.block { margin-top: 44px; }
+h2 {
+  font-family: var(--font-display); font-weight: 700; font-size: 22px;
+  margin: 0 0 6px; letter-spacing: -0.005em; text-wrap: balance;
+}
+.section-lede { margin: 0 0 16px; color: var(--muted); max-width: 66ch; }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.stat .v { font-family: var(--font-display); font-weight: 700; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 13px; color: var(--muted); }
+
+.patterns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.pat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.pat .pn { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); }
+.pat h3 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; line-height: 1.25; text-wrap: balance; }
+.pat p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.pat .where { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+.qs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.q { border-top: 3px solid var(--accent); background: var(--surface); border-radius: 0 0 8px 8px; padding: 12px 16px 14px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.q h3 { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; margin: 0 0 4px; }
+.q p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+.sources { font-size: 13px; color: var(--muted); }
+.sources ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.sources a { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) { .chip { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="kicker">Tech-wave case study · 1993–2006</div>
+    <h1>The internet stack, layer by layer</h1>
+    <p class="lede">Who was in each layer of the internet at three points in time, what eventually happened to them, and the main reason each layer turned out the way it did. Read from the bottom up: cables and hardware at the bottom, the sites people used at the top.</p>
+  </header>
+
+  <div class="legend" id="legend" role="group" aria-label="Highlight companies by outcome">
+    <span class="legend-label">Highlight:</span>
+  </div>
+
+  <div class="map" id="map"></div>
+  <p class="read-hint">Rows run top to bottom from the sites people used (L8) down to long-haul fiber (L1).</p>
+
+  <section class="block" aria-labelledby="numbers-h">
+    <h2 id="numbers-h">The boom and bust in numbers</h2>
+    <p class="section-lede">Usage kept growing straight through the crash. Prices and the companies that borrowed to build ahead of demand did not survive it.</p>
+    <div class="stats">
+      <div class="stat"><div class="v">77M → 413M → 1B</div><div class="l">People online worldwide in 1996, 2000 and 2005 (Live Internet Stats, from ITU data)</div></div>
+      <div class="stat"><div class="v">5,048 → 1,114</div><div class="l">Nasdaq Composite, March 2000 peak to October 2002 low (about −78%)</div></div>
+      <div class="stat"><div class="v">2–5%</div><div class="l">Share of US fiber-optic cable actually lit and carrying traffic in 2002 (FDIC)</div></div>
+      <div class="stat"><div class="v">~$2 trillion</div><div class="l">Investor losses in telecom by mid-2002, with about half a million jobs gone (BusinessWeek)</div></div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="patterns-h">
+    <h2 id="patterns-h">Patterns that cut across layers</h2>
+    <p class="section-lede">These are the parts of the story that are most likely to repeat in the next wave.</p>
+    <div class="patterns" id="patterns"></div>
+  </section>
+
+  <section class="block" aria-labelledby="qs-h">
+    <h2 id="qs-h">Three questions to ask of any layer</h2>
+    <p class="section-lede">Most of the outcomes above follow from the answers to these.</p>
+    <div class="qs">
+      <div class="q"><h3>Is someone building ahead of demand with borrowed money?</h3><p>Debt-funded capacity built on growth forecasts ends in bankruptcy when growth slows, even if demand catches up later (L1, L3).</p></div>
+      <div class="q"><h3>Where is the bottleneck, and who owns it?</h3><p>Control follows the bottleneck. When it moved from software to the physical line, AOL lost the customer to the cable and phone companies (L4).</p></div>
+      <div class="q"><h3>Does the idea need something that isn't ready yet?</h3><p>Grocery delivery, pet supplies online and music streaming were right ideas that died waiting for broadband, logistics and payments (L7, L8).</p></div>
+    </div>
+  </section>
+
+  <section class="block sources" aria-labelledby="src-h">
+    <h2 id="src-h">Sources</h2>
+    <p class="section-lede" style="margin-bottom:0">Spot-checked figures are linked below. Other dates and deal values come from public announcements; check them before quoting.</p>
+    <ul>
+      <li><a href="https://webarchive.library.unt.edu/eot2008/20090512203422/https:/www.fdic.gov/bank/analytical/bank/bt0205.pdf">FDIC Bank Trends (2002): telecom defaults and share of fiber lit</a></li>
+      <li><a href="https://www.bloomberg.com/news/articles/2002-08-04/inside-the-telecom-game">BusinessWeek (2002): Inside the telecom game</a></li>
+      <li><a href="https://money.cnn.com/magazines/fortune/fortune_archive/2002/06/24/325183/">Fortune (2002): Global Crossing's collapse</a></li>
+      <li><a href="https://heritage.cisco.com/2000_marketcap/">Cisco heritage: most valuable company, March 2000</a></li>
+      <li><a href="https://www.barchart.com/story/news/36596164/cisco-stock-just-set-a-new-all-time-high-for-the-first-time-in-25-years-should-you-buy-csco-here">Barchart: Cisco passes its 2000 peak after 25 years</a></li>
+      <li><a href="https://www.upi.com/Archives/2001/12/28/AOL-hits-33-million-subscriber-mark/4171009515600/">UPI (2001): AOL passes 33 million members</a></li>
+      <li><a href="https://www.fromedome.com/2011/11/aol-dialup-charts">From the Dome: AOL losing 5 million subscribers a year in 2006–07</a></li>
+      <li><a href="https://www.guinnessworldrecords.com/world-records/549540-greatest-annual-loss-by-a-company-inflation-adjusted">Guinness World Records: AOL Time Warner's $98.7B loss</a></li>
+      <li><a href="https://www.infoworld.com/article/2210054/ie-loses-market-share-as-trend-reverses.html">InfoWorld (2004): Internet Explorer above 95% share since 2002</a></li>
+      <li><a href="https://www.pewresearch.org/internet/2008/07/02/home-broadband-2008/">Pew Research: Home Broadband 2008</a></li>
+      <li><a href="https://ictframe.com/internet-users-of-the-world-increasing-rapidly">Internet users by year (Live Internet Stats, from ITU data)</a></li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+const OUTCOMES = [
+  { k: "won",   g: "▲", label: "Won" },
+  { k: "held",  g: "●", label: "Held on / niche" },
+  { k: "acq",   g: "→", label: "Acquired" },
+  { k: "faded", g: "▼", label: "Faded" },
+  { k: "shut",  g: "✕", label: "Shut down / bankrupt" },
+  { k: "std",   g: "◆", label: "Became a free standard" }
+];
+const GLYPH = Object.fromEntries(OUTCOMES.map(o => [o.k, o.g]));
+const LABEL = Object.fromEntries(OUTCOMES.map(o => [o.k, o.label]));
+
+const ERAS = [
+  { yr: "~1996", name: "Gold rush begins", desc: "Netscape's 1995 IPO starts the boom. About 77M people are online, mostly on dial-up through AOL or a local provider." },
+  { yr: "~2000", name: "Bubble peak", desc: "The Nasdaq peaks in March. Cisco is the world's most valuable company. Carriers lay fiber far faster than traffic grows." },
+  { yr: "~2006", name: "Survivors and Web 2.0", desc: "About 1B people online; most US home users on broadband. Google, Amazon and eBay emerge as winners; user-made content takes off." }
+];
+
+/* chip: [name, outcome, note] */
+const LAYERS = [
+  {
+    n: "L8", name: "Content, media & communities", sub: "Sites people visited to read, watch, share and talk",
+    c: [
+      [["GeoCities","acq","free home pages → Yahoo 1999, $3.57B; shut 2009"],["Broadcast.com","acq","internet radio → Yahoo 1999, $5.7B"],["theGlobe.com","shut","IPO Nov 1998 rose 606% on day one, then collapsed"],["Craigslist","held","classifieds since 1995, still independent"]],
+      [["Napster","shut","1999 music sharing; shut by the courts 2001"],["Blogger","acq","1999 → Google 2003"],["AOL Instant Messenger","faded","huge in 2000; shut 2017"],["Wikipedia","std","2001, nonprofit, open license"]],
+      [["Facebook","won","2004; opened to everyone Sept 2006"],["YouTube","acq","2005 → Google 2006, $1.65B"],["MySpace","faded","→ News Corp 2005, $580M; sold 2011 for $35M"],["Friendster","faded","2002; lost users to MySpace and Facebook"],["iTunes Store","won","Apple 2003, the legal version of Napster"]]
+    ],
+    tag: "User-made content and real identity",
+    why: "Early communities were bought at bubble prices and faded. The winners let users create the content and connected people under real names, so each new member made the site better for everyone else. Napster proved the demand; Apple built the legal version after the lawsuits."
+  },
+  {
+    n: "L7", name: "Commerce & marketplaces", sub: "Buying, selling and paying online",
+    c: [
+      [["Amazon","won","books 1994; IPO 1997"],["eBay","won","auctions 1995; IPO 1998"],["Priceline","won","1997; nearly died, became Booking Holdings"]],
+      [["Pets.com","shut","IPO Feb 2000; liquidated Nov 2000"],["Webvan","shut","grocery delivery; IPO 1999, bankrupt July 2001"],["eToys","shut","bankrupt 2001"],["Boo.com","shut","online fashion; collapsed May 2000"],["PayPal","acq","1999 → eBay 2002, $1.5B"],["Amazon","won","stock fell about 95% by 2001; kept building"]],
+      [["Amazon","won","profitable since 2003; launches AWS 2006"],["eBay + PayPal","won","the default marketplace and wallet"],["Priceline","won","rebuilt around hotel bookings"],["Netflix","won","DVDs by mail, IPO 2002; streaming 2007"]]
+    ],
+    tag: "Network effects, discipline and timing",
+    why: "Marketplaces with network effects (eBay) and relentless operators (Amazon) survived the crash. Ventures that needed cheap delivery and broadband died early, and many came back a decade later as Instacart and Chewy. A right idea at the wrong time fails just like a wrong idea."
+  },
+  {
+    n: "L6", name: "Search, portals & ads", sub: "The front door: how people found things, and who got paid",
+    c: [
+      [["Yahoo","faded","directory 1994, IPO 1996; sold to Verizon 2017, $4.5B"],["Excite","shut","merged with @Home 1999; bankrupt 2001"],["Lycos","faded","→ Terra 2000 for $12.5B; resold 2004 for about $95M"],["Infoseek","shut","folded into Disney's Go.com; shut 2001"],["AltaVista","faded","best early search engine; passed around, shut 2013"]],
+      [["Google","won","founded 1998; AdWords 2000"],["GoTo.com / Overture","acq","invented pay-per-click search ads; → Yahoo 2003, $1.6B"],["DoubleClick","acq","banner ad network → Google 2008, $3.1B"],["AOL · MSN portals","faded","walled gardens of bought content"],["Ask Jeeves","acq","→ IAC 2005"]],
+      [["Google","won","IPO 2004; search plus ad auctions"],["Yahoo","faded","bought Overture and Inktomi, still lost search"],["Microsoft search","held","own engine 2005, later Bing"],["Baidu","won","China's search leader, IPO 2005"]]
+    ],
+    tag: "Owning demand, plus the right business model",
+    why: "Portals acted like media companies, buying content to fill pages. Google became the toll booth on what people were looking for. Its ad auction, built on Overture's pay-per-click idea, charged only for clicks. Better results brought more users, and more users brought more advertisers."
+  },
+  {
+    n: "L5", name: "Browsers", sub: "The window onto the web, and the fight over who controls it",
+    c: [
+      [["Netscape Navigator","acq","about 90% share in 1995–96; → AOL 1999"],["Internet Explorer","won","Microsoft 1995, bundled with Windows"],["Mosaic","faded","1993, first popular graphical browser"],["Java (Sun)","held","1995; seen as a threat to Windows"]],
+      [["Internet Explorer","won","most-used browser by 1999"],["Mozilla project","std","Netscape opens its code, 1998"],["Opera","held","small independent browser"]],
+      [["Internet Explorer","faded","above 95% share 2002–04, then slid"],["Firefox","std","2004, open source; first real challenger"],["Safari","held","Apple 2003"],["Netscape","shut","support ended 2008"]]
+    ],
+    tag: "The platform owner bundles and wins",
+    why: "Microsoft put Internet Explorer into Windows, which ran over 90% of PCs, and gave it away. Netscape could no longer charge for a browser and sold to AOL. Only the antitrust case and an open-source successor (Firefox) slowed the bundle."
+  },
+  {
+    n: "L4", name: "Getting people online", sub: "Dial-up services, then broadband over cable and phone lines",
+    c: [
+      [["AOL","faded","dial-up leader; 33M members by end of 2001"],["CompuServe","acq","→ AOL 1998"],["Prodigy","acq","→ SBC 2001"],["EarthLink","faded","largest independent provider"]],
+      [["AOL Time Warner","faded","$165B merger announced Jan 2000; $98.7B loss in 2002"],["Excite@Home","shut","cable broadband; bankrupt Sept 2001"],["NorthPoint · Rhythms","shut","DSL upstarts after the 1996 Telecom Act; bankrupt 2001"],["NetZero · Juno","faded","free dial-up with ads; merged 2001"]],
+      [["Cable companies (Comcast)","won","cable modems, the largest home broadband source"],["SBC (AT&T) · Verizon","won","DSL over their own phone lines"],["AOL","faded","losing about 5M subscribers a year; email made free 2006"]]
+    ],
+    tag: "Whoever owns the wire",
+    why: "With dial-up, the software layer (AOL) owned the customer because any phone line worked. Broadband moved the bottleneck to the physical line, and the cable and phone companies that owned it took the customer. Most DSL upstarts renting other people's lines went bankrupt."
+  },
+  {
+    n: "L3", name: "Hosting, data centers & delivery", sub: "Where websites lived and how they reached users",
+    c: [
+      [["Exodus","shut","the leading web host; bankrupt Sept 2001"],["Digital Island","acq","→ Cable & Wireless 2001"],["Rackspace","held","founded 1998, managed hosting"]],
+      [["Akamai","held","IPO 1999; stock fell from over $300 to under $1 by 2002"],["Equinix","won","founded 1998, neutral meeting points"],["Inktomi","acq","caching and search software → Yahoo 2003"]],
+      [["Equinix","won","the neutral interconnection hub"],["Akamai","held","the leading delivery network"],["Google's own data centers","won","built its own, on cheap parts"]]
+    ],
+    tag: "Survive the crash, then own the meeting point",
+    why: "Hosts that borrowed heavily to build data centers went bankrupt when dot-com tenants stopped paying. Survivors kept the buildings cheaply and became the base of the cloud era: Equinix as the neutral meeting point, Akamai as the delivery network."
+  },
+  {
+    n: "L2", name: "Servers, network gear & web software", sub: "The boxes and code that ran the web",
+    c: [
+      [["Sun Microsystems","faded","'the dot in dot-com'; → Oracle 2010"],["Cisco","held","routers; world's most valuable company by March 2000"],["Oracle database","held","the default dot-com database"],["Apache web server","std","1995, open source; quickly the most used"]],
+      [["Lucent","faded","spun off from AT&T 1996; merged into Alcatel 2006"],["Nortel","shut","telecom gear giant; bankrupt 2009"],["JDS Uniphase","faded","optical parts; giant write-downs in 2001"],["Juniper","held","IPO 1999, router challenger"],["Linux","std","free OS on cheap Intel servers"],["Red Hat","won","IPO 1999; sold Linux support"]],
+      [["LAMP stack","std","Linux, Apache, MySQL, PHP: the free web stack"],["Intel · AMD servers","won","cheap x86 boxes replace Sun"],["Cisco","held","survived; stock took about 25 years to pass its 2000 peak"],["Huawei","won","low-cost telecom gear rising from China"]]
+    ],
+    tag: "Cheap and open beats premium and proprietary",
+    why: "Dot-coms first bought expensive Sun servers and Oracle licenses. The survivors switched to free Linux and Apache on cheap Intel servers. Telecom gear makers lent money to their own customers to keep orders coming; when those carriers failed, Lucent and Nortel collapsed."
+  },
+  {
+    n: "L1", name: "Fiber & backbone networks", sub: "Long-distance and undersea cables between cities and countries",
+    c: [
+      [["WorldCom / MCI","shut","roll-up of carriers; accounting fraud, bankrupt 2002"],["AT&T","acq","long-distance giant → SBC 2005, which took the name"],["Qwest","acq","fiber laid along railroads → CenturyLink 2011"],["Sprint","held","long-distance and wireless"]],
+      [["Global Crossing","shut","worth $47B in Feb 2000, about $70M at bankruptcy, Jan 2002"],["360networks","shut","bankrupt 2001"],["Williams Communications","shut","bankrupt 2002"],["FLAG Telecom","shut","undersea cables; bankrupt 2002"],["Level 3","acq","1998; survived, → CenturyLink 2017"]],
+      [["Verizon · SBC (AT&T)","won","bought MCI and AT&T; re-consolidated long distance"],["Level 3","acq","bought distressed networks cheaply"],["Global Crossing","acq","emerged from bankruptcy; → Level 3 2011"],["Google","won","reportedly buying cheap unused fiber"]]
+    ],
+    tag: "The builders go bankrupt; the next wave rides cheap",
+    why: "Carriers borrowed heavily to lay fiber ahead of demand. By 2002 only about 2 to 5% of US fiber was lit. The cables stayed in the ground, buyers picked them up for a fraction of the cost, and that cheap bandwidth later carried YouTube and video streaming."
+  }
+];
+
+const PATTERNS = [
+  { t: "Overbuilding bankrupts the builders; the next wave rides cheap", p: "Fiber and data centers were built on borrowed money ahead of demand. The builders failed, but the capacity stayed and became cheap for Google, YouTube and the cloud.", w: "L1 · L3" },
+  { t: "The crash punished everyone and didn't pick the winners", p: "Amazon, Akamai and Priceline all lost 90% or more and still won. Cisco survived as a company, but its stock took about 25 years to recover.", w: "L2 · L3 · L7" },
+  { t: "Control follows the bottleneck", p: "When broadband made the physical line the scarce part, the wire owners took the customer from AOL. When search made finding things the scarce part, Google took it from the portals.", w: "L4 · L6" },
+  { t: "The platform owner bundles the layer on top", p: "Microsoft bundled the browser into Windows and Netscape lost. The cloud era repeats this with PaaS.", w: "L5" },
+  { t: "Owning demand plus the right business model wins the top", p: "Google, Amazon and eBay owned what people were looking for and found a way to charge for it. Portals that bought content to fill pages faded.", w: "L6 · L7" },
+  { t: "Cheap and open beats premium during a build-out", p: "Linux and Apache on cheap Intel servers replaced Sun and expensive licenses.", w: "L2" },
+  { t: "Right idea, wrong time looks like a wrong idea", p: "Webvan, Pets.com, GeoCities and Napster all came back as Instacart, Chewy, social networks and Spotify once broadband, payments and logistics were ready.", w: "L7 · L8" },
+  { t: "Bubble money makes bad deals", p: "Inflated stock bought Time Warner, GeoCities and Lycos, all later written down. Gear makers lent to their own customers, so demand looked stronger than it was.", w: "L2 · L4 · L6" }
+];
+
+/* Build legend */
+const counts = {};
+LAYERS.forEach(L => L.c.forEach(col => col.forEach(ch => { counts[ch[1]] = (counts[ch[1]] || 0) + 1; })));
+const legend = document.getElementById("legend");
+const map = document.getElementById("map");
+OUTCOMES.forEach(o => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "fbtn";
+  b.id = "f-" + o.k;
+  b.dataset.o = o.k;
+  b.setAttribute("aria-pressed", "false");
+  b.innerHTML = '<span class="g" aria-hidden="true">' + o.g + '</span>' + o.label + ' <span class="n">' + (counts[o.k] || 0) + '</span>';
+  b.addEventListener("click", () => setFilter(map.dataset.filter === o.k ? null : o.k));
+  legend.appendChild(b);
+});
+const reset = document.createElement("button");
+reset.type = "button"; reset.className = "fbtn reset"; reset.id = "f-all"; reset.textContent = "Show all";
+reset.addEventListener("click", () => setFilter(null));
+legend.appendChild(reset);
+const note = document.createElement("div");
+note.className = "legend-note";
+note.textContent = "Each company is marked with what eventually happened to it, so a chip in the 1996 column can show a 2001 outcome.";
+legend.appendChild(note);
+
+function setFilter(k) {
+  if (k) map.dataset.filter = k; else delete map.dataset.filter;
+  legend.querySelectorAll(".fbtn[data-o]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.o === k)));
+}
+
+/* Build map */
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+let html = '<div class="row head"><div class="cell"><div class="era-yr">Layer</div><div class="era-name">Stack</div><div class="era-desc">Top: what people used. Bottom: what it ran on.</div></div>';
+ERAS.forEach(e => {
+  html += '<div class="cell"><div class="era-yr">' + e.yr + '</div><div class="era-name">' + esc(e.name) + '</div><div class="era-desc">' + esc(e.desc) + '</div></div>';
+});
+html += '<div class="cell head-why"><div class="era-yr">Outcome</div><div class="era-name" style="margin-top:2px">What decided it</div><div class="era-desc">The main reason the layer ended up the way it did.</div></div></div>';
+
+LAYERS.forEach((L, i) => {
+  const tint = 3 + i * 2.2; /* deeper tint toward the physical layers at the bottom */
+  html += '<div class="row" id="layer-' + L.n.toLowerCase() + '">';
+  html += '<div class="cell layer" style="--tint:' + tint.toFixed(1) + '%"><div class="lnum">' + L.n + '</div><div class="lname">' + esc(L.name) + '</div><div class="lsub">' + esc(L.sub) + '</div></div>';
+  L.c.forEach((col, ci) => {
+    html += '<div class="cell snap"><div class="snap-label">' + ERAS[ci].yr + ' · ' + esc(ERAS[ci].name) + '</div>';
+    col.forEach(ch => {
+      html += '<div class="chip" data-o="' + ch[1] + '" title="' + LABEL[ch[1]] + '"><span class="g" aria-label="' + LABEL[ch[1]] + '">' + GLYPH[ch[1]] + '</span><span class="nm">' + esc(ch[0]) + '</span>' + (ch[2] ? '<span class="nt">' + esc(ch[2]) + '</span>' : '') + '</div>';
+    });
+    html += '</div>';
+  });
+  html += '<div class="cell why"><span class="tag">' + esc(L.tag) + '</span><p>' + esc(L.why) + '</p></div>';
+  html += '</div>';
+});
+map.innerHTML = html;
+
+/* Patterns */
+document.getElementById("patterns").innerHTML = PATTERNS.map((p, i) =>
+  '<div class="pat"><div class="pn">Pattern ' + (i + 1) + '</div><h3>' + esc(p.t) + '</h3><p>' + esc(p.p) + '</p><div class="where">Seen in ' + p.w + '</div></div>'
+).join("");
+</script>
+</body>
+</html>
